@@ -8,21 +8,26 @@ interface Message {
 }
 
 function formatText(text: string) {
-  return text.split("\n").map((line, i) => {
+  return text.split("\n").map((line, i, arr) => {
     const parts = line.split(/(\*[^*]+\*)/g);
     return (
       <span key={i}>
-        {parts.map((part, j) => {
-          if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
-            return <strong key={j}>{part.slice(1, -1)}</strong>;
-          }
-          return <span key={j}>{part}</span>;
-        })}
-        {i < text.split("\n").length - 1 && <br />}
+        {parts.map((part, j) =>
+          part.startsWith("*") && part.endsWith("*") && part.length > 2 ? (
+            <strong key={j}>{part.slice(1, -1)}</strong>
+          ) : (
+            <span key={j}>{part}</span>
+          )
+        )}
+        {i < arr.length - 1 && <br />}
       </span>
     );
   });
 }
+
+const SAMPLE_URLS = [
+  "techcrunch.com", "wired.com", "reuters.com",
+];
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -37,39 +42,42 @@ export default function Home() {
   const [error, setError] = useState("");
   const [notionStatus, setNotionStatus] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  function reset() {
+    setSummary("");
+    setArticleTitle("");
+    setPageContent("");
+    setMessages([]);
+    setError("");
+    setNotionStatus("");
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }
 
   async function fetchAndSummarize() {
     if (!url.trim()) return;
-
     setLoading(true);
     setError("");
     setSummary("");
     setArticleTitle("");
     setMessages([]);
     setNotionStatus("");
-
     try {
       const res = await fetch("/api/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url.trim() }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "要約に失敗しました");
-
       setSummary(data.summary);
       setPageContent(data.pageContent);
-
-      const titleMatch = data.summary.match(/^\*(.+?)\*/);
-      if (titleMatch) setArticleTitle(titleMatch[1]);
+      const m = data.summary.match(/^\*(.+?)\*/);
+      if (m) setArticleTitle(m[1]);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "エラーが発生しました");
     } finally {
@@ -79,30 +87,21 @@ export default function Home() {
 
   async function sendChat() {
     if (!chatInput.trim() || !pageContent) return;
-
-    const userMessage: Message = { role: "user", content: chatInput.trim() };
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
+    const userMsg: Message = { role: "user", content: chatInput.trim() };
+    const next = [...messages, userMsg];
+    setMessages(next);
     setChatInput("");
     setChatLoading(true);
     setError("");
-
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: newMessages,
-          url,
-          pageContent,
-          summary,
-        }),
+        body: JSON.stringify({ messages: next, url, pageContent, summary }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "チャットエラーが発生しました");
-
-      setMessages([...newMessages, { role: "assistant", content: data.reply }]);
+      setMessages([...next, { role: "assistant", content: data.reply }]);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "チャットエラーが発生しました");
     } finally {
@@ -112,10 +111,8 @@ export default function Home() {
 
   async function saveToNotion() {
     if (!summary) return;
-
     setNotionLoading(true);
     setNotionStatus("");
-
     try {
       const res = await fetch("/api/notion", {
         method: "POST",
@@ -127,338 +124,409 @@ export default function Home() {
           date: new Date().toISOString().split("T")[0],
         }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Notion保存エラー");
-      setNotionStatus("Notionに保存しました！");
+      setNotionStatus("保存しました ✓");
     } catch (e: unknown) {
-      setNotionStatus(e instanceof Error ? e.message : "Notion保存に失敗しました");
+      setNotionStatus(e instanceof Error ? e.message : "保存に失敗しました");
     } finally {
       setNotionLoading(false);
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>, action: () => void) {
+  function handleKeyDown(
+    e: React.KeyboardEvent<HTMLInputElement>,
+    action: () => void
+  ) {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       action();
     }
   }
 
-  return (
-    <div className="min-h-screen" style={{ background: "#0f1117" }}>
-      {/* Header */}
-      <header
+  /* ─── HERO (no summary) ─── */
+  if (!summary && !loading) {
+    return (
+      <main
         style={{
-          background: "#161b2e",
-          borderBottom: "1px solid #2a3050",
-          padding: "16px 24px",
+          minHeight: "100vh",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
+          justifyContent: "center",
+          padding: "24px 16px",
+          background: "linear-gradient(160deg, #fafafa 0%, #f5f3ff 100%)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 28 }}>
           <div
             style={{
-              width: 32,
-              height: 32,
-              borderRadius: "8px",
+              width: 44,
+              height: 44,
+              borderRadius: 12,
               background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "16px",
+              boxShadow: "0 4px 14px rgba(99,102,241,0.35)",
             }}
           >
-            ✦
+            <span style={{ color: "#fff", fontSize: 20, fontWeight: 700 }}>S</span>
           </div>
-          <span style={{ fontSize: "20px", fontWeight: 700, color: "#e2e8f0" }}>SummaryAI</span>
+          <span style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.5px", color: "#111" }}>
+            SummaryAI
+          </span>
         </div>
-      </header>
 
-      <div style={{ maxWidth: "860px", margin: "0 auto", padding: "24px 16px" }}>
-        {/* URL Input */}
-        <div
+        {/* Headline */}
+        <h1
           style={{
-            background: "#161b2e",
-            border: "1px solid #2a3050",
-            borderRadius: "12px",
-            padding: "20px",
-            marginBottom: "20px",
+            fontSize: "clamp(28px, 5vw, 46px)",
+            fontWeight: 800,
+            textAlign: "center",
+            lineHeight: 1.2,
+            letterSpacing: "-1px",
+            color: "#111",
+            marginBottom: 14,
+            maxWidth: 600,
           }}
         >
-          <label style={{ display: "block", fontSize: "13px", color: "#94a3b8", marginBottom: "8px" }}>
-            要約するURLを入力
-          </label>
-          <div style={{ display: "flex", gap: "10px" }}>
+          URLを貼るだけで、<br />
+          <span className="gradient-text">記事を日本語で要約</span>します
+        </h1>
+
+        <p
+          style={{
+            fontSize: 16,
+            color: "#6b7280",
+            textAlign: "center",
+            marginBottom: 36,
+            maxWidth: 420,
+            lineHeight: 1.6,
+          }}
+        >
+          VC・投資家・スタートアップ関係者向けに、
+          海外記事を即座に日本語で要約・翻訳します。
+        </p>
+
+        {/* URL Input card */}
+        <div
+          className="card"
+          style={{ width: "100%", maxWidth: 600, padding: "20px 20px 16px", marginBottom: 12 }}
+        >
+          <div
+            className="hero-input-row"
+            style={{ display: "flex", gap: 10, alignItems: "center" }}
+          >
             <input
+              ref={inputRef}
               type="url"
+              className="hero-input"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => handleKeyDown(e, fetchAndSummarize)}
-              placeholder="https://example.com/article"
-              style={{
-                flex: 1,
-                background: "#0f1117",
-                border: "1px solid #2a3050",
-                borderRadius: "8px",
-                padding: "10px 14px",
-                color: "#e2e8f0",
-                fontSize: "14px",
-                outline: "none",
-              }}
+              placeholder="https://techcrunch.com/..."
+              autoFocus
             />
             <button
+              className="btn-primary"
               onClick={fetchAndSummarize}
-              disabled={loading || !url.trim()}
-              style={{
-                background: loading || !url.trim() ? "#1e2a45" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                border: "none",
-                borderRadius: "8px",
-                padding: "10px 24px",
-                color: loading || !url.trim() ? "#4a5568" : "#fff",
-                fontSize: "14px",
-                fontWeight: 600,
-                cursor: loading || !url.trim() ? "not-allowed" : "pointer",
-                whiteSpace: "nowrap",
-                transition: "all 0.2s",
-              }}
+              disabled={!url.trim()}
+              style={{ padding: "12px 24px", fontSize: 15, borderRadius: 10 }}
             >
-              {loading ? "処理中..." : "要約する"}
+              要約する
             </button>
           </div>
+          <p style={{ marginTop: 10, fontSize: 12, color: "#9ca3af" }}>
+            例：{SAMPLE_URLS.join(" / ")} などのURL
+          </p>
         </div>
 
-        {/* Error */}
-        {error && (
-          <div
-            style={{
-              background: "#2d1b1b",
-              border: "1px solid #5c2626",
-              borderRadius: "8px",
-              padding: "12px 16px",
-              color: "#fc8181",
-              fontSize: "14px",
-              marginBottom: "20px",
-            }}
-          >
-            {error}
-          </div>
-        )}
+        {error && <div className="error-banner" style={{ maxWidth: 600, width: "100%", marginTop: 8 }}>{error}</div>}
 
-        {/* Loading */}
-        {loading && (
-          <div
-            style={{
-              background: "#161b2e",
-              border: "1px solid #2a3050",
-              borderRadius: "12px",
-              padding: "40px",
-              textAlign: "center",
-              marginBottom: "20px",
-            }}
-          >
-            <div style={{ color: "#6366f1", fontSize: "24px", marginBottom: "12px" }}>⟳</div>
-            <p style={{ color: "#94a3b8", fontSize: "14px" }}>ページを取得して要約中...</p>
-          </div>
-        )}
-
-        {/* Summary */}
-        {summary && !loading && (
-          <div
-            style={{
-              background: "#161b2e",
-              border: "1px solid #2a3050",
-              borderRadius: "12px",
-              padding: "24px",
-              marginBottom: "20px",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ color: "#6366f1", fontSize: "16px" }}>✦</span>
-                <span style={{ fontSize: "14px", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  AI要約
-                </span>
-              </div>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                {notionStatus && (
-                  <span style={{ fontSize: "12px", color: notionStatus.includes("保存しました") ? "#68d391" : "#fc8181" }}>
-                    {notionStatus}
-                  </span>
-                )}
-                <button
-                  onClick={saveToNotion}
-                  disabled={notionLoading}
-                  style={{
-                    background: notionLoading ? "#1e2a45" : "#1e3a5f",
-                    border: "1px solid " + (notionLoading ? "#2a3a5e" : "#2d5a8e"),
-                    borderRadius: "6px",
-                    padding: "6px 14px",
-                    color: notionLoading ? "#4a5568" : "#90cdf4",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    cursor: notionLoading ? "not-allowed" : "pointer",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  {notionLoading ? "保存中..." : "Notionに保存"}
-                </button>
-              </div>
-            </div>
-            <div style={{ color: "#e2e8f0", fontSize: "15px", lineHeight: "1.8", whiteSpace: "pre-wrap" }}>
-              {formatText(summary)}
-            </div>
-          </div>
-        )}
-
-        {/* Chat */}
-        {summary && !loading && (
-          <div
-            style={{
-              background: "#161b2e",
-              border: "1px solid #2a3050",
-              borderRadius: "12px",
-              overflow: "hidden",
-            }}
-          >
+        {/* Features */}
+        <div
+          style={{
+            display: "flex",
+            gap: 16,
+            marginTop: 40,
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
+          {[
+            { icon: "⚡", label: "即時要約" },
+            { icon: "💬", label: "チャットで深掘り" },
+            { icon: "📋", label: "Notionに保存" },
+          ].map(({ icon, label }) => (
             <div
+              key={label}
               style={{
-                padding: "14px 20px",
-                borderBottom: "1px solid #2a3050",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
+                gap: 6,
+                padding: "8px 16px",
+                background: "#fff",
+                border: "1px solid #e5e7eb",
+                borderRadius: 20,
+                fontSize: 13,
+                color: "#374151",
+                fontWeight: 500,
               }}
             >
-              <span style={{ color: "#6366f1", fontSize: "16px" }}>💬</span>
-              <span style={{ fontSize: "14px", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                チャット
-              </span>
-              <span style={{ fontSize: "12px", color: "#4a5568", marginLeft: "8px" }}>質問・全文翻訳など</span>
+              <span>{icon}</span>
+              <span>{label}</span>
             </div>
+          ))}
+        </div>
+      </main>
+    );
+  }
 
-            {messages.length > 0 && (
-              <div
-                ref={chatContainerRef}
-                style={{
-                  maxHeight: "400px",
-                  overflowY: "auto",
-                  padding: "16px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
-                }}
-              >
-                {messages.map((msg, idx) => (
-                  <div key={idx} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                    <div
-                      style={{
-                        maxWidth: "80%",
-                        background: msg.role === "user" ? "linear-gradient(135deg, #4f46e5, #7c3aed)" : "#1e2a45",
-                        borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                        padding: "12px 16px",
-                        color: "#e2e8f0",
-                        fontSize: "14px",
-                        lineHeight: "1.7",
-                        whiteSpace: "pre-wrap",
-                      }}
-                    >
-                      {msg.role === "assistant" ? formatText(msg.content) : msg.content}
-                    </div>
-                  </div>
-                ))}
-                {chatLoading && (
-                  <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                    <div style={{ background: "#1e2a45", borderRadius: "16px 16px 16px 4px", padding: "12px 16px", color: "#94a3b8", fontSize: "14px" }}>
-                      考え中...
-                    </div>
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-            )}
+  /* ─── LOADING ─── */
+  if (loading) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#fafafa",
+          gap: 16,
+        }}
+      >
+        <div
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: "50%",
+            border: "3px solid #e5e7eb",
+            borderTopColor: "#6366f1",
+            animation: "spin 0.8s linear infinite",
+          }}
+        />
+        <p style={{ fontSize: 15, color: "#6b7280", fontWeight: 500 }}>
+          ページを取得して要約中...
+        </p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </main>
+    );
+  }
 
-            {messages.length === 0 && (
-              <div style={{ padding: "12px 16px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {["全文翻訳してください", "この記事の著者は誰ですか？", "投資家視点でのポイントを教えてください"].map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => setChatInput(suggestion)}
-                    style={{
-                      background: "#1e2a45",
-                      border: "1px solid #2a3a5e",
-                      borderRadius: "20px",
-                      padding: "6px 14px",
-                      color: "#94a3b8",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            )}
+  /* ─── RESULTS ─── */
+  return (
+    <div style={{ minHeight: "100vh", background: "#fafafa" }}>
+      {/* Top bar */}
+      <header
+        style={{
+          background: "#fff",
+          borderBottom: "1px solid #e5e7eb",
+          padding: "0 24px",
+          height: 56,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>S</span>
+          </div>
+          <span style={{ fontSize: 17, fontWeight: 700, color: "#111" }}>SummaryAI</span>
+        </div>
+        <button className="btn-secondary" onClick={reset} style={{ padding: "7px 16px", fontSize: 13 }}>
+          ＋ 新しい記事を要約する
+        </button>
+      </header>
 
-            <div
-              style={{
-                padding: "12px 16px",
-                borderTop: messages.length > 0 ? "1px solid #2a3050" : "none",
-                display: "flex",
-                gap: "8px",
-              }}
-            >
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, sendChat)}
-                placeholder="質問を入力... (Enter で送信)"
-                disabled={chatLoading}
-                style={{
-                  flex: 1,
-                  background: "#0f1117",
-                  border: "1px solid #2a3050",
-                  borderRadius: "8px",
-                  padding: "10px 14px",
-                  color: "#e2e8f0",
-                  fontSize: "14px",
-                  outline: "none",
-                }}
-              />
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "28px 16px 60px" }}>
+        {/* URL pill */}
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            background: "#f3f4f6",
+            border: "1px solid #e5e7eb",
+            borderRadius: 20,
+            padding: "5px 12px",
+            fontSize: 12,
+            color: "#6b7280",
+            marginBottom: 20,
+            maxWidth: "100%",
+            overflow: "hidden",
+          }}
+        >
+          <span style={{ flexShrink: 0 }}>🔗</span>
+          <span
+            style={{
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {url}
+          </span>
+        </div>
+
+        {error && <div className="error-banner" style={{ marginBottom: 16 }}>{error}</div>}
+
+        {/* Summary card */}
+        <div className="card" style={{ padding: "24px", marginBottom: 20 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 18,
+              flexWrap: "wrap",
+              gap: 10,
+            }}
+          >
+            <span className="section-label">AI 要約</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {notionStatus && (
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: notionStatus.includes("✓") ? "#16a34a" : "#dc2626",
+                  }}
+                >
+                  {notionStatus}
+                </span>
+              )}
               <button
-                onClick={sendChat}
-                disabled={chatLoading || !chatInput.trim()}
-                style={{
-                  background: chatLoading || !chatInput.trim() ? "#1e2a45" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                  border: "none",
-                  borderRadius: "8px",
-                  padding: "10px 20px",
-                  color: chatLoading || !chatInput.trim() ? "#4a5568" : "#fff",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  cursor: chatLoading || !chatInput.trim() ? "not-allowed" : "pointer",
-                  transition: "all 0.2s",
-                }}
+                className="btn-notion"
+                onClick={saveToNotion}
+                disabled={notionLoading}
               >
-                送信
+                {notionLoading ? "保存中..." : "📋 Notionに保存"}
               </button>
             </div>
           </div>
-        )}
-
-        {/* Empty state */}
-        {!summary && !loading && (
-          <div style={{ textAlign: "center", padding: "60px 20px" }}>
-            <div style={{ fontSize: "48px", marginBottom: "16px" }}>✦</div>
-            <p style={{ fontSize: "16px", color: "#64748b" }}>URLを入力して要約を開始してください</p>
-            <p style={{ fontSize: "13px", color: "#4a5568", marginTop: "8px" }}>
-              Jina AIでページ内容を取得し、Claude AIで日本語要約を生成します
-            </p>
+          <div
+            style={{
+              fontSize: 15,
+              lineHeight: 1.85,
+              color: "#1f2937",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {formatText(summary)}
           </div>
-        )}
+        </div>
+
+        {/* Chat card */}
+        <div className="card" style={{ overflow: "hidden" }}>
+          <div
+            style={{
+              padding: "14px 20px",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 15 }}>💬</span>
+            <span className="section-label">チャット</span>
+            <span style={{ fontSize: 12, color: "#9ca3af", marginLeft: 4 }}>
+              質問・全文翻訳など
+            </span>
+          </div>
+          <div className="divider" />
+
+          {/* Messages */}
+          {messages.length > 0 && (
+            <div
+              style={{
+                maxHeight: 440,
+                overflowY: "auto",
+                padding: "16px 20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              {messages.map((msg, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+                  }}
+                >
+                  <div
+                    className={msg.role === "user" ? "bubble-user" : "bubble-ai"}
+                    style={{ whiteSpace: "pre-wrap" }}
+                  >
+                    {msg.role === "assistant" ? formatText(msg.content) : msg.content}
+                  </div>
+                </div>
+              ))}
+              {chatLoading && (
+                <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                  <div className="bubble-ai" style={{ color: "#9ca3af" }}>考え中...</div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+          )}
+
+          {/* Quick chips */}
+          {messages.length === 0 && (
+            <div style={{ padding: "12px 20px", display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[
+                "全文翻訳してください",
+                "著者と媒体を教えてください",
+                "投資家視点でのポイントは？",
+              ].map((s) => (
+                <button key={s} className="chip" onClick={() => setChatInput(s)}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="divider" />
+
+          {/* Input row */}
+          <div style={{ padding: "12px 16px", display: "flex", gap: 8 }}>
+            <input
+              type="text"
+              className="input-field"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, sendChat)}
+              placeholder="質問を入力... (Enter で送信)"
+              disabled={chatLoading}
+            />
+            <button
+              className="btn-primary"
+              onClick={sendChat}
+              disabled={chatLoading || !chatInput.trim()}
+              style={{ padding: "10px 18px" }}
+            >
+              送信
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
