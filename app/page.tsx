@@ -7,25 +7,6 @@ interface Message {
   content: string;
 }
 
-const SUMMARY_SYSTEM_PROMPT = `あなたはプロの翻訳者兼編集者です。以下のWebページを読み、VC・投資家・スタートアップ関係者向けに日本語で要約してください。
-
-出力フォーマットは以下を厳守：
-*[記事タイトル]*
-
-[4〜5行の散文サマリー]
-
-*ポイント*
-- [ポイント1]
-- [ポイント2]
-...
-
-Markdownは使用禁止。太字は*テキスト*、箇条書きは・を使用。`;
-
-const CHAT_SYSTEM_PROMPT = `あなたはプロの翻訳者兼リサーチアシスタントです。VC・投資家・スタートアップ関係者向けに日本語で回答してください。
-- 「全文翻訳」を求められた場合：元記事を漏れなく自然な日本語で全文翻訳する
-- 質問された場合：会話履歴と記事内容を踏まえて正確に回答する
-- Markdownは使用禁止。太字は*テキスト*、箇条書きは•を使用`;
-
 function formatText(text: string) {
   return text.split("\n").map((line, i) => {
     const parts = line.split(/(\*[^*]+\*)/g);
@@ -44,8 +25,6 @@ function formatText(text: string) {
 }
 
 export default function Home() {
-  const [anthropicKey, setAnthropicKey] = useState("");
-  const [notionKey, setNotionKey] = useState("");
   const [url, setUrl] = useState("");
   const [summary, setSummary] = useState("");
   const [articleTitle, setArticleTitle] = useState("");
@@ -57,7 +36,6 @@ export default function Home() {
   const [notionLoading, setNotionLoading] = useState(false);
   const [error, setError] = useState("");
   const [notionStatus, setNotionStatus] = useState("");
-  const [showApiKeys, setShowApiKeys] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -69,10 +47,6 @@ export default function Home() {
 
   async function fetchAndSummarize() {
     if (!url.trim()) return;
-    if (!anthropicKey.trim()) {
-      setError("Anthropic APIキーを入力してください");
-      return;
-    }
 
     setLoading(true);
     setError("");
@@ -82,45 +56,19 @@ export default function Home() {
     setNotionStatus("");
 
     try {
-      const jinaUrl = `https://r.jina.ai/${url.trim()}`;
-      const jinaRes = await fetch(jinaUrl, {
-        headers: { Accept: "text/plain" },
-      });
-      if (!jinaRes.ok) throw new Error("ページの取得に失敗しました");
-      const content = await jinaRes.text();
-      setPageContent(content);
-
-      const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/summarize", {
         method: "POST",
-        headers: {
-          "x-api-key": anthropicKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-          "anthropic-dangerous-allow-browser": "true",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2048,
-          system: SUMMARY_SYSTEM_PROMPT,
-          messages: [
-            {
-              role: "user",
-              content: `以下のWebページ内容を要約してください:\n\nURL: ${url}\n\n${content}`,
-            },
-          ],
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim() }),
       });
 
-      if (!anthropicRes.ok) {
-        const errData = await anthropicRes.json();
-        throw new Error(errData.error?.message || "Anthropic APIエラー");
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "要約に失敗しました");
 
-      const data = await anthropicRes.json();
-      const summaryText = data.content[0].text;
-      setSummary(summaryText);
+      setSummary(data.summary);
+      setPageContent(data.pageContent);
 
-      const titleMatch = summaryText.match(/^\*(.+?)\*/);
+      const titleMatch = data.summary.match(/^\*(.+?)\*/);
       if (titleMatch) setArticleTitle(titleMatch[1]);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "エラーが発生しました");
@@ -131,10 +79,6 @@ export default function Home() {
 
   async function sendChat() {
     if (!chatInput.trim() || !pageContent) return;
-    if (!anthropicKey.trim()) {
-      setError("Anthropic APIキーを入力してください");
-      return;
-    }
 
     const userMessage: Message = { role: "user", content: chatInput.trim() };
     const newMessages = [...messages, userMessage];
@@ -144,46 +88,21 @@ export default function Home() {
     setError("");
 
     try {
-      const contextualMessages = newMessages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-
-      const firstUserIdx = contextualMessages.findIndex((m) => m.role === "user");
-      if (firstUserIdx !== -1) {
-        contextualMessages[firstUserIdx] = {
-          role: "user",
-          content: `記事URL: ${url}\n\n記事内容:\n${pageContent}\n\n要約:\n${summary}\n\n質問: ${contextualMessages[firstUserIdx].content}`,
-        };
-      }
-
-      const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/chat", {
         method: "POST",
-        headers: {
-          "x-api-key": anthropicKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-          "anthropic-dangerous-allow-browser": "true",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 4096,
-          system: CHAT_SYSTEM_PROMPT,
-          messages: contextualMessages,
+          messages: newMessages,
+          url,
+          pageContent,
+          summary,
         }),
       });
 
-      if (!anthropicRes.ok) {
-        const errData = await anthropicRes.json();
-        throw new Error(errData.error?.message || "Anthropic APIエラー");
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "チャットエラーが発生しました");
 
-      const data = await anthropicRes.json();
-      const assistantMessage: Message = {
-        role: "assistant",
-        content: data.content[0].text,
-      };
-      setMessages([...newMessages, assistantMessage]);
+      setMessages([...newMessages, { role: "assistant", content: data.reply }]);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "チャットエラーが発生しました");
     } finally {
@@ -192,10 +111,7 @@ export default function Home() {
   }
 
   async function saveToNotion() {
-    if (!summary || !notionKey.trim()) {
-      setNotionStatus("Notion APIキーと要約が必要です");
-      return;
-    }
+    if (!summary) return;
 
     setNotionLoading(true);
     setNotionStatus("");
@@ -205,10 +121,9 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          notionApiKey: notionKey,
           title: articleTitle || url,
-          url: url,
-          summary: summary,
+          url,
+          summary,
           date: new Date().toISOString().split("T")[0],
         }),
       });
@@ -240,7 +155,6 @@ export default function Home() {
           padding: "16px 24px",
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -260,84 +174,9 @@ export default function Home() {
           </div>
           <span style={{ fontSize: "20px", fontWeight: 700, color: "#e2e8f0" }}>SummaryAI</span>
         </div>
-        <button
-          onClick={() => setShowApiKeys(!showApiKeys)}
-          style={{
-            background: "#1e2a45",
-            border: "1px solid #2a3a5e",
-            borderRadius: "6px",
-            color: "#94a3b8",
-            padding: "6px 12px",
-            cursor: "pointer",
-            fontSize: "13px",
-          }}
-        >
-          {showApiKeys ? "APIキーを隠す" : "APIキーを表示"}
-        </button>
       </header>
 
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "24px 16px" }}>
-        {/* API Keys Section */}
-        {showApiKeys && (
-          <div
-            style={{
-              background: "#161b2e",
-              border: "1px solid #2a3050",
-              borderRadius: "12px",
-              padding: "20px",
-              marginBottom: "20px",
-            }}
-          >
-            <p style={{ fontSize: "12px", color: "#64748b", marginBottom: "12px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              APIキー設定
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "13px", color: "#94a3b8", marginBottom: "6px" }}>
-                  Anthropic API Key
-                </label>
-                <input
-                  type="password"
-                  value={anthropicKey}
-                  onChange={(e) => setAnthropicKey(e.target.value)}
-                  placeholder="sk-ant-..."
-                  style={{
-                    width: "100%",
-                    background: "#0f1117",
-                    border: "1px solid #2a3050",
-                    borderRadius: "8px",
-                    padding: "8px 12px",
-                    color: "#e2e8f0",
-                    fontSize: "14px",
-                    outline: "none",
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: "13px", color: "#94a3b8", marginBottom: "6px" }}>
-                  Notion API Key
-                </label>
-                <input
-                  type="password"
-                  value={notionKey}
-                  onChange={(e) => setNotionKey(e.target.value)}
-                  placeholder="secret_..."
-                  style={{
-                    width: "100%",
-                    background: "#0f1117",
-                    border: "1px solid #2a3050",
-                    borderRadius: "8px",
-                    padding: "8px 12px",
-                    color: "#e2e8f0",
-                    fontSize: "14px",
-                    outline: "none",
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* URL Input */}
         <div
           style={{
@@ -407,7 +246,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* Loading State */}
+        {/* Loading */}
         {loading && (
           <div
             style={{
@@ -424,7 +263,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* Summary Section */}
+        {/* Summary */}
         {summary && !loading && (
           <div
             style={{
@@ -444,28 +283,22 @@ export default function Home() {
               </div>
               <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 {notionStatus && (
-                  <span
-                    style={{
-                      fontSize: "12px",
-                      color: notionStatus.includes("保存しました") ? "#68d391" : "#fc8181",
-                    }}
-                  >
+                  <span style={{ fontSize: "12px", color: notionStatus.includes("保存しました") ? "#68d391" : "#fc8181" }}>
                     {notionStatus}
                   </span>
                 )}
                 <button
                   onClick={saveToNotion}
-                  disabled={notionLoading || !notionKey.trim()}
-                  title={!notionKey.trim() ? "Notion APIキーを入力してください" : ""}
+                  disabled={notionLoading}
                   style={{
-                    background: notionLoading || !notionKey.trim() ? "#1e2a45" : "#1e3a5f",
-                    border: "1px solid " + (notionLoading || !notionKey.trim() ? "#2a3a5e" : "#2d5a8e"),
+                    background: notionLoading ? "#1e2a45" : "#1e3a5f",
+                    border: "1px solid " + (notionLoading ? "#2a3a5e" : "#2d5a8e"),
                     borderRadius: "6px",
                     padding: "6px 14px",
-                    color: notionLoading || !notionKey.trim() ? "#4a5568" : "#90cdf4",
+                    color: notionLoading ? "#4a5568" : "#90cdf4",
                     fontSize: "13px",
                     fontWeight: 500,
-                    cursor: notionLoading || !notionKey.trim() ? "not-allowed" : "pointer",
+                    cursor: notionLoading ? "not-allowed" : "pointer",
                     transition: "all 0.2s",
                   }}
                 >
@@ -473,20 +306,13 @@ export default function Home() {
                 </button>
               </div>
             </div>
-            <div
-              style={{
-                color: "#e2e8f0",
-                fontSize: "15px",
-                lineHeight: "1.8",
-                whiteSpace: "pre-wrap",
-              }}
-            >
+            <div style={{ color: "#e2e8f0", fontSize: "15px", lineHeight: "1.8", whiteSpace: "pre-wrap" }}>
               {formatText(summary)}
             </div>
           </div>
         )}
 
-        {/* Chat Section */}
+        {/* Chat */}
         {summary && !loading && (
           <div
             style={{
@@ -509,12 +335,9 @@ export default function Home() {
               <span style={{ fontSize: "14px", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 チャット
               </span>
-              <span style={{ fontSize: "12px", color: "#4a5568", marginLeft: "8px" }}>
-                質問・全文翻訳など
-              </span>
+              <span style={{ fontSize: "12px", color: "#4a5568", marginLeft: "8px" }}>質問・全文翻訳など</span>
             </div>
 
-            {/* Messages */}
             {messages.length > 0 && (
               <div
                 ref={chatContainerRef}
@@ -528,13 +351,7 @@ export default function Home() {
                 }}
               >
                 {messages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: "flex",
-                      justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-                    }}
-                  >
+                  <div key={idx} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
                     <div
                       style={{
                         maxWidth: "80%",
@@ -553,15 +370,7 @@ export default function Home() {
                 ))}
                 {chatLoading && (
                   <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                    <div
-                      style={{
-                        background: "#1e2a45",
-                        borderRadius: "16px 16px 16px 4px",
-                        padding: "12px 16px",
-                        color: "#94a3b8",
-                        fontSize: "14px",
-                      }}
-                    >
+                    <div style={{ background: "#1e2a45", borderRadius: "16px 16px 16px 4px", padding: "12px 16px", color: "#94a3b8", fontSize: "14px" }}>
                       考え中...
                     </div>
                   </div>
@@ -570,35 +379,29 @@ export default function Home() {
               </div>
             )}
 
-            {/* Quick Actions */}
             {messages.length === 0 && (
               <div style={{ padding: "12px 16px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {["全文翻訳してください", "この記事の著者は誰ですか？", "投資家視点でのポイントを教えてください"].map(
-                  (suggestion) => (
-                    <button
-                      key={suggestion}
-                      onClick={() => {
-                        setChatInput(suggestion);
-                      }}
-                      style={{
-                        background: "#1e2a45",
-                        border: "1px solid #2a3a5e",
-                        borderRadius: "20px",
-                        padding: "6px 14px",
-                        color: "#94a3b8",
-                        fontSize: "12px",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                      }}
-                    >
-                      {suggestion}
-                    </button>
-                  )
-                )}
+                {["全文翻訳してください", "この記事の著者は誰ですか？", "投資家視点でのポイントを教えてください"].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => setChatInput(suggestion)}
+                    style={{
+                      background: "#1e2a45",
+                      border: "1px solid #2a3a5e",
+                      borderRadius: "20px",
+                      padding: "6px 14px",
+                      color: "#94a3b8",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
               </div>
             )}
 
-            {/* Chat Input */}
             <div
               style={{
                 padding: "12px 16px",
@@ -646,15 +449,9 @@ export default function Home() {
           </div>
         )}
 
-        {/* Empty State */}
+        {/* Empty state */}
         {!summary && !loading && (
-          <div
-            style={{
-              textAlign: "center",
-              padding: "60px 20px",
-              color: "#4a5568",
-            }}
-          >
+          <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: "48px", marginBottom: "16px" }}>✦</div>
             <p style={{ fontSize: "16px", color: "#64748b" }}>URLを入力して要約を開始してください</p>
             <p style={{ fontSize: "13px", color: "#4a5568", marginTop: "8px" }}>
