@@ -25,10 +25,6 @@ function formatText(text: string) {
   });
 }
 
-const SAMPLE_URLS = [
-  "techcrunch.com", "wired.com", "reuters.com",
-];
-
 export default function Home() {
   const [url, setUrl] = useState("");
   const [summary, setSummary] = useState("");
@@ -134,153 +130,186 @@ export default function Home() {
     }
   }
 
-  function handleKeyDown(
-    e: React.KeyboardEvent<HTMLInputElement>,
-    action: () => void
-  ) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>, action: () => void) {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       action();
     }
   }
 
-  /* ─── HERO (no summary) ─── */
+  /* ─── HERO ─── */
   if (!summary && !loading) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "24px 16px",
-          background: "linear-gradient(160deg, #fafafa 0%, #f5f3ff 100%)",
-        }}
-      >
-        {/* Logo */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 28 }}>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 4px 14px rgba(99,102,241,0.35)",
-            }}
-          >
-            <span style={{ color: "#fff", fontSize: 20, fontWeight: 700 }}>S</span>
-          </div>
-          <span style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.5px", color: "#111" }}>
-            SummaryAI
-          </span>
-        </div>
-
-        {/* Headline */}
-        <h1
+      <div style={{ minHeight: "100vh", background: "#fff", display: "flex", flexDirection: "column" }}>
+        {/* Nav */}
+        <nav
           style={{
-            fontSize: "clamp(28px, 5vw, 46px)",
-            fontWeight: 800,
-            textAlign: "center",
-            lineHeight: 1.2,
-            letterSpacing: "-1px",
-            color: "#111",
-            marginBottom: 14,
-            maxWidth: 600,
-          }}
-        >
-          URLを貼るだけで、<br />
-          <span className="gradient-text">記事を日本語で要約</span>します
-        </h1>
-
-        <p
-          style={{
-            fontSize: 16,
-            color: "#6b7280",
-            textAlign: "center",
-            marginBottom: 36,
-            maxWidth: 420,
-            lineHeight: 1.6,
-          }}
-        >
-          VC・投資家・スタートアップ関係者向けに、
-          海外記事を即座に日本語で要約・翻訳します。
-        </p>
-
-        {/* URL Input card */}
-        <div
-          className="card"
-          style={{ width: "100%", maxWidth: 600, padding: "20px 20px 16px", marginBottom: 12 }}
-        >
-          <div
-            className="hero-input-row"
-            style={{ display: "flex", gap: 10, alignItems: "center" }}
-          >
-            <input
-              ref={inputRef}
-              type="url"
-              className="hero-input"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => handleKeyDown(e, fetchAndSummarize)}
-              placeholder="https://techcrunch.com/..."
-              autoFocus
-            />
-            <button
-              className="btn-primary"
-              onClick={fetchAndSummarize}
-              disabled={!url.trim()}
-              style={{ padding: "12px 24px", fontSize: 15, borderRadius: 10 }}
-            >
-              要約する
-            </button>
-          </div>
-          <p style={{ marginTop: 10, fontSize: 12, color: "#9ca3af" }}>
-            例：{SAMPLE_URLS.join(" / ")} などのURL
-          </p>
-        </div>
-
-        {error && <div className="error-banner" style={{ maxWidth: 600, width: "100%", marginTop: 8 }}>{error}</div>}
-
-        {/* Features */}
-        <div
-          style={{
+            padding: "0 40px",
+            height: 64,
             display: "flex",
-            gap: 16,
-            marginTop: 40,
-            flexWrap: "wrap",
-            justifyContent: "center",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "1px solid #f0f0f0",
           }}
         >
-          {[
-            { icon: "⚡", label: "即時要約" },
-            { icon: "💬", label: "チャットで深掘り" },
-            { icon: "📋", label: "Notionに保存" },
-          ].map(({ icon, label }) => (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div
-              key={label}
               style={{
+                width: 28,
+                height: 28,
+                borderRadius: 7,
+                background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
                 display: "flex",
                 alignItems: "center",
-                gap: 6,
-                padding: "8px 16px",
-                background: "#fff",
-                border: "1px solid #e5e7eb",
-                borderRadius: 20,
-                fontSize: 13,
-                color: "#374151",
-                fontWeight: 500,
+                justifyContent: "center",
+                flexShrink: 0,
               }}
             >
-              <span>{icon}</span>
-              <span>{label}</span>
+              <span style={{ color: "#fff", fontSize: 13, fontWeight: 800 }}>S</span>
             </div>
-          ))}
-        </div>
-      </main>
+            <span style={{ fontSize: 16, fontWeight: 800, letterSpacing: "-0.3px", color: "#0a0a0a" }}>
+              SummaryAI
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#737373", fontWeight: 500 }}>
+            <span>⚡ 即時要約</span>
+            <span style={{ margin: "0 4px", color: "#e5e5e5" }}>·</span>
+            <span>💬 チャット</span>
+            <span style={{ margin: "0 4px", color: "#e5e5e5" }}>·</span>
+            <span>📋 Notion保存</span>
+          </div>
+        </nav>
+
+        {/* Hero body */}
+        <main
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "60px 24px 80px",
+          }}
+        >
+          {/* Headline */}
+          <h1
+            style={{
+              fontSize: "clamp(36px, 6.5vw, 72px)",
+              fontWeight: 900,
+              textAlign: "center",
+              lineHeight: 1.08,
+              letterSpacing: "-2.5px",
+              color: "#0a0a0a",
+              marginBottom: 20,
+              maxWidth: 720,
+            }}
+          >
+            URLを貼るだけで、
+            <br />
+            <span className="gradient-text">記事を日本語で要約</span>
+          </h1>
+
+          <p
+            style={{
+              fontSize: 17,
+              color: "#737373",
+              textAlign: "center",
+              marginBottom: 48,
+              maxWidth: 440,
+              lineHeight: 1.65,
+              fontWeight: 400,
+            }}
+          >
+            VC・投資家・スタートアップ関係者向けに、
+            海外記事を即座に日本語で要約・翻訳します。
+          </p>
+
+          {/* Input */}
+          <div style={{ width: "100%", maxWidth: 580 }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                alignItems: "center",
+                background: "#fff",
+                border: "2px solid #e5e5e5",
+                borderRadius: 16,
+                padding: "8px 8px 8px 18px",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
+                transition: "border-color 0.2s, box-shadow 0.2s",
+              }}
+              onFocus={() => {}}
+            >
+              <span style={{ color: "#a3a3a3", fontSize: 16, flexShrink: 0 }}>🔗</span>
+              <input
+                ref={inputRef}
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, fetchAndSummarize)}
+                placeholder="https://techcrunch.com/..."
+                autoFocus
+                style={{
+                  flex: 1,
+                  border: "none",
+                  outline: "none",
+                  fontSize: 15,
+                  color: "#0a0a0a",
+                  background: "transparent",
+                  fontFamily: "inherit",
+                  minWidth: 0,
+                }}
+              />
+              <button
+                className="btn-primary"
+                onClick={fetchAndSummarize}
+                disabled={!url.trim()}
+                style={{ borderRadius: 10, padding: "10px 20px", fontSize: 14, flexShrink: 0 }}
+              >
+                要約する →
+              </button>
+            </div>
+            <p style={{ marginTop: 12, fontSize: 12, color: "#a3a3a3", textAlign: "center" }}>
+              例：techcrunch.com / wired.com / reuters.com などの記事URL
+            </p>
+          </div>
+
+          {error && (
+            <div className="error-banner" style={{ maxWidth: 580, width: "100%", marginTop: 16 }}>
+              {error}
+            </div>
+          )}
+
+          {/* Feature badges */}
+          <div style={{ display: "flex", gap: 12, marginTop: 52, flexWrap: "wrap", justifyContent: "center" }}>
+            {[
+              { icon: "⚡", label: "Jina AIでページ取得" },
+              { icon: "🤖", label: "Claude AIで日本語要約" },
+              { icon: "💬", label: "そのままチャットで深掘り" },
+              { icon: "📋", label: "Notionにワンクリック保存" },
+            ].map(({ icon, label }) => (
+              <div
+                key={label}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 14px",
+                  background: "#fafafa",
+                  border: "1px solid #e5e5e5",
+                  borderRadius: 100,
+                  fontSize: 12,
+                  color: "#525252",
+                  fontWeight: 500,
+                }}
+              >
+                <span>{icon}</span>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+        </main>
+      </div>
     );
   }
 
@@ -294,23 +323,28 @@ export default function Home() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "#fafafa",
-          gap: 16,
+          background: "#fff",
+          gap: 20,
         }}
       >
         <div
           style={{
-            width: 48,
-            height: 48,
+            width: 44,
+            height: 44,
             borderRadius: "50%",
-            border: "3px solid #e5e7eb",
+            border: "3px solid #e5e5e5",
             borderTopColor: "#6366f1",
-            animation: "spin 0.8s linear infinite",
+            animation: "spin 0.75s linear infinite",
           }}
         />
-        <p style={{ fontSize: 15, color: "#6b7280", fontWeight: 500 }}>
-          ページを取得して要約中...
-        </p>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ fontSize: 16, fontWeight: 700, color: "#0a0a0a", letterSpacing: "-0.3px" }}>
+            要約中...
+          </p>
+          <p style={{ fontSize: 13, color: "#a3a3a3", marginTop: 4 }}>
+            ページを取得してAIが解析しています
+          </p>
+        </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </main>
     );
@@ -319,83 +353,99 @@ export default function Home() {
   /* ─── RESULTS ─── */
   return (
     <div style={{ minHeight: "100vh", background: "#fafafa" }}>
-      {/* Top bar */}
+      {/* Sticky header */}
       <header
         style={{
           background: "#fff",
-          borderBottom: "1px solid #e5e7eb",
-          padding: "0 24px",
-          height: 56,
+          borderBottom: "1px solid #f0f0f0",
+          padding: "0 32px",
+          height: 60,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           position: "sticky",
           top: 0,
           zIndex: 10,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div
             style={{
-              width: 30,
-              height: 30,
-              borderRadius: 8,
+              width: 26,
+              height: 26,
+              borderRadius: 7,
               background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>S</span>
+            <span style={{ color: "#fff", fontSize: 12, fontWeight: 800 }}>S</span>
           </div>
-          <span style={{ fontSize: 17, fontWeight: 700, color: "#111" }}>SummaryAI</span>
+          <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-0.3px", color: "#0a0a0a" }}>
+            SummaryAI
+          </span>
         </div>
-        <button className="btn-secondary" onClick={reset} style={{ padding: "7px 16px", fontSize: 13 }}>
+        <button className="btn-secondary" onClick={reset} style={{ fontSize: 13, padding: "7px 16px" }}>
           ＋ 新しい記事を要約する
         </button>
       </header>
 
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "28px 16px 60px" }}>
+      <div style={{ maxWidth: 740, margin: "0 auto", padding: "32px 20px 80px" }}>
+        {/* Article title */}
+        {articleTitle && (
+          <h2
+            style={{
+              fontSize: "clamp(20px, 3vw, 28px)",
+              fontWeight: 800,
+              letterSpacing: "-0.7px",
+              color: "#0a0a0a",
+              lineHeight: 1.25,
+              marginBottom: 8,
+            }}
+          >
+            {articleTitle}
+          </h2>
+        )}
+
         {/* URL pill */}
-        <div
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
           style={{
             display: "inline-flex",
             alignItems: "center",
-            gap: 6,
-            background: "#f3f4f6",
-            border: "1px solid #e5e7eb",
-            borderRadius: 20,
-            padding: "5px 12px",
+            gap: 5,
+            background: "#f5f5f5",
+            border: "1px solid #e5e5e5",
+            borderRadius: 100,
+            padding: "4px 12px",
             fontSize: 12,
-            color: "#6b7280",
-            marginBottom: 20,
+            color: "#737373",
+            marginBottom: 28,
             maxWidth: "100%",
             overflow: "hidden",
+            textDecoration: "none",
+            transition: "color 0.2s",
           }}
         >
-          <span style={{ flexShrink: 0 }}>🔗</span>
-          <span
-            style={{
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
+          <span style={{ flexShrink: 0 }}>↗</span>
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {url}
           </span>
-        </div>
+        </a>
 
-        {error && <div className="error-banner" style={{ marginBottom: 16 }}>{error}</div>}
+        {error && <div className="error-banner" style={{ marginBottom: 20 }}>{error}</div>}
 
         {/* Summary card */}
-        <div className="card" style={{ padding: "24px", marginBottom: 20 }}>
+        <div className="card" style={{ padding: "28px 32px", marginBottom: 16 }}>
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: 18,
+              marginBottom: 20,
               flexWrap: "wrap",
               gap: 10,
             }}
@@ -403,100 +453,58 @@ export default function Home() {
             <span className="section-label">AI 要約</span>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {notionStatus && (
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: notionStatus.includes("✓") ? "#16a34a" : "#dc2626",
-                  }}
-                >
+                <span style={{ fontSize: 12, fontWeight: 600, color: notionStatus.includes("✓") ? "#16a34a" : "#e11d48" }}>
                   {notionStatus}
                 </span>
               )}
-              <button
-                className="btn-notion"
-                onClick={saveToNotion}
-                disabled={notionLoading}
-              >
+              <button className="btn-notion" onClick={saveToNotion} disabled={notionLoading}>
                 {notionLoading ? "保存中..." : "📋 Notionに保存"}
               </button>
             </div>
           </div>
-          <div
-            style={{
-              fontSize: 15,
-              lineHeight: 1.85,
-              color: "#1f2937",
-              whiteSpace: "pre-wrap",
-            }}
-          >
+          <div style={{ fontSize: 15, lineHeight: 1.9, color: "#1a1a1a", whiteSpace: "pre-wrap" }}>
             {formatText(summary)}
           </div>
         </div>
 
         {/* Chat card */}
         <div className="card" style={{ overflow: "hidden" }}>
-          <div
-            style={{
-              padding: "14px 20px",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <span style={{ fontSize: 15 }}>💬</span>
+          <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: 8 }}>
             <span className="section-label">チャット</span>
-            <span style={{ fontSize: 12, color: "#9ca3af", marginLeft: 4 }}>
-              質問・全文翻訳など
-            </span>
+            <span style={{ fontSize: 12, color: "#a3a3a3" }}>質問・全文翻訳など</span>
           </div>
           <div className="divider" />
 
-          {/* Messages */}
           {messages.length > 0 && (
             <div
               style={{
-                maxHeight: 440,
+                maxHeight: 480,
                 overflowY: "auto",
-                padding: "16px 20px",
+                padding: "20px 24px",
                 display: "flex",
                 flexDirection: "column",
-                gap: 12,
+                gap: 14,
               }}
             >
               {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-                  }}
-                >
-                  <div
-                    className={msg.role === "user" ? "bubble-user" : "bubble-ai"}
-                    style={{ whiteSpace: "pre-wrap" }}
-                  >
+                <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                  <div className={msg.role === "user" ? "bubble-user" : "bubble-ai"} style={{ whiteSpace: "pre-wrap" }}>
                     {msg.role === "assistant" ? formatText(msg.content) : msg.content}
                   </div>
                 </div>
               ))}
               {chatLoading && (
                 <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                  <div className="bubble-ai" style={{ color: "#9ca3af" }}>考え中...</div>
+                  <div className="bubble-ai" style={{ color: "#a3a3a3" }}>考え中...</div>
                 </div>
               )}
               <div ref={chatEndRef} />
             </div>
           )}
 
-          {/* Quick chips */}
           {messages.length === 0 && (
-            <div style={{ padding: "12px 20px", display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {[
-                "全文翻訳してください",
-                "著者と媒体を教えてください",
-                "投資家視点でのポイントは？",
-              ].map((s) => (
+            <div style={{ padding: "14px 24px", display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {["全文翻訳してください", "著者と媒体を教えてください", "投資家視点でのポイントは？"].map((s) => (
                 <button key={s} className="chip" onClick={() => setChatInput(s)}>
                   {s}
                 </button>
@@ -506,8 +514,7 @@ export default function Home() {
 
           <div className="divider" />
 
-          {/* Input row */}
-          <div style={{ padding: "12px 16px", display: "flex", gap: 8 }}>
+          <div style={{ padding: "14px 16px", display: "flex", gap: 8 }}>
             <input
               type="text"
               className="input-field"
@@ -521,7 +528,7 @@ export default function Home() {
               className="btn-primary"
               onClick={sendChat}
               disabled={chatLoading || !chatInput.trim()}
-              style={{ padding: "10px 18px" }}
+              style={{ padding: "10px 20px", flexShrink: 0 }}
             >
               送信
             </button>
