@@ -39,10 +39,18 @@ export default function Home() {
   const [notionStatus, setNotionStatus] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const el = chatInputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, [chatInput]);
 
   function reset() {
     setSummary("");
@@ -514,15 +522,22 @@ export default function Home() {
 
           <div className="divider" />
 
-          <div style={{ padding: "14px 16px", display: "flex", gap: 8 }}>
-            <input
-              type="text"
+          <div style={{ padding: "14px 16px", display: "flex", gap: 8, alignItems: "flex-end" }}>
+            <textarea
+              ref={chatInputRef}
               className="input-field"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => handleKeyDown(e, sendChat)}
-              placeholder="質問を入力... (Enter で送信)"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  sendChat();
+                }
+              }}
+              placeholder="質問を入力... (Enter で送信 / Shift+Enter で改行)"
               disabled={chatLoading}
+              rows={1}
+              style={{ resize: "none", overflow: "hidden", lineHeight: "1.5" }}
             />
             <button
               className="btn-primary"
