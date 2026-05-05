@@ -338,6 +338,75 @@ export default function Home() {
             </div>
           )}
 
+          {/* Notion integration section */}
+          {notionAuth !== null && (
+            <div style={{ width: "100%", maxWidth: 580, marginTop: 20 }}>
+              {notionAuth.loggedIn ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "11px 18px",
+                    background: "#f0fdf4",
+                    border: "1px solid #bbf7d0",
+                    borderRadius: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 15 }}>📋</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#16a34a" }}>
+                      Notion連携済み：{notionAuth.workspace_name}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleNotionLogout}
+                    style={{
+                      fontSize: 12,
+                      color: "#6b7280",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    ログアウト
+                  </button>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    padding: "14px 18px",
+                    background: "#fafafa",
+                    border: "1px solid #e5e5e5",
+                    borderRadius: 12,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#0a0a0a" }}>
+                      📋 Notionと連携する
+                    </div>
+                    <div style={{ fontSize: 12, color: "#737373", marginTop: 3, lineHeight: 1.5 }}>
+                      要約結果をあなたのNotionデータベースに自動保存できます
+                    </div>
+                  </div>
+                  <a
+                    href="/api/notion/auth"
+                    className="btn-secondary"
+                    style={{ fontSize: 12, padding: "7px 14px", textDecoration: "none", flexShrink: 0 }}
+                  >
+                    Notionでログイン →
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Feature badges */}
           <div style={{ display: "flex", gap: 12, marginTop: 52, flexWrap: "wrap", justifyContent: "center" }}>
             {[
@@ -427,10 +496,7 @@ export default function Home() {
         }}
       >
         {/* Logo — clickable, returns to home */}
-        <div
-          onClick={reset}
-          style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
-        >
+        <div onClick={reset} className="logo-link">
           <div
             style={{
               width: 26,
@@ -440,6 +506,7 @@ export default function Home() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              flexShrink: 0,
             }}
           >
             <span style={{ color: "#fff", fontSize: 12, fontWeight: 800 }}>S</span>
