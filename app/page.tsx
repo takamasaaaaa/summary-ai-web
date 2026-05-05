@@ -7,6 +7,12 @@ interface Message {
   content: string;
 }
 
+interface NotionAuth {
+  loggedIn: boolean;
+  workspace_name?: string;
+  has_database?: boolean;
+}
+
 function formatText(text: string) {
   return text.split("\n").map((line, i, arr) => {
     const parts = line.split(/(\*[^*]+\*)/g);
@@ -37,6 +43,7 @@ export default function Home() {
   const [notionLoading, setNotionLoading] = useState(false);
   const [error, setError] = useState("");
   const [notionStatus, setNotionStatus] = useState("");
+  const [notionAuth, setNotionAuth] = useState<NotionAuth | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -52,6 +59,31 @@ export default function Home() {
     el.style.height = el.scrollHeight + "px";
   }, [chatInput]);
 
+  // Fetch Notion login status
+  useEffect(() => {
+    fetch("/api/notion/me")
+      .then((r) => r.json())
+      .then(setNotionAuth)
+      .catch(() => setNotionAuth({ loggedIn: false }));
+  }, []);
+
+  // Handle OAuth return: check for error param or pending URL in sessionStorage
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("notion_error")) {
+      setError("Notionログインに失敗しました。もう一度お試しください。");
+      window.history.replaceState({}, "", "/");
+    }
+
+    const pendingUrl = sessionStorage.getItem("notion_pending_url");
+    if (pendingUrl) {
+      sessionStorage.removeItem("notion_pending_url");
+      setUrl(pendingUrl);
+      startSummarize(pendingUrl);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function reset() {
     setSummary("");
     setArticleTitle("");
@@ -59,11 +91,13 @@ export default function Home() {
     setMessages([]);
     setError("");
     setNotionStatus("");
+    setUrl("");
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
-  async function fetchAndSummarize() {
-    if (!url.trim()) return;
+  async function startSummarize(targetUrl: string) {
+    const urlToFetch = targetUrl.trim();
+    if (!urlToFetch) return;
     setLoading(true);
     setError("");
     setSummary("");
@@ -74,7 +108,7 @@ export default function Home() {
       const res = await fetch("/api/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: urlToFetch }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "要約に失敗しました");
@@ -87,6 +121,10 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function fetchAndSummarize() {
+    startSummarize(url);
   }
 
   async function sendChat() {
@@ -115,6 +153,13 @@ export default function Home() {
 
   async function saveToNotion() {
     if (!summary) return;
+
+    if (!notionAuth?.loggedIn) {
+      sessionStorage.setItem("notion_pending_url", url);
+      window.location.href = "/api/notion/auth";
+      return;
+    }
+
     setNotionLoading(true);
     setNotionStatus("");
     try {
@@ -136,6 +181,12 @@ export default function Home() {
     } finally {
       setNotionLoading(false);
     }
+  }
+
+  async function handleNotionLogout() {
+    await fetch("/api/notion/logout", { method: "POST" });
+    setNotionAuth({ loggedIn: false });
+    setNotionStatus("");
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>, action: () => void) {
@@ -246,7 +297,6 @@ export default function Home() {
                 boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
                 transition: "border-color 0.2s, box-shadow 0.2s",
               }}
-              onFocus={() => {}}
             >
               <span style={{ color: "#a3a3a3", fontSize: 16, flexShrink: 0 }}>🔗</span>
               <input
@@ -376,7 +426,11 @@ export default function Home() {
           zIndex: 10,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {/* Logo — clickable, returns to home */}
+        <div
+          onClick={reset}
+          style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+        >
           <div
             style={{
               width: 26,
@@ -394,9 +448,51 @@ export default function Home() {
             SummaryAI
           </span>
         </div>
-        <button className="btn-secondary" onClick={reset} style={{ fontSize: 13, padding: "7px 16px" }}>
-          ＋ 新しい記事を要約する
-        </button>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* Notion auth status */}
+          {notionAuth?.loggedIn ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 12, color: "#737373" }}>
+                Notion: <strong style={{ color: "#0a0a0a" }}>{notionAuth.workspace_name}</strong>
+              </span>
+              <button
+                onClick={handleNotionLogout}
+                style={{
+                  fontSize: 11,
+                  color: "#a3a3a3",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  padding: 0,
+                }}
+              >
+                ログアウト
+              </button>
+            </div>
+          ) : (
+            <a
+              href="/api/notion/auth"
+              style={{
+                fontSize: 12,
+                color: "#6366f1",
+                fontWeight: 600,
+                textDecoration: "none",
+                border: "1px solid #e0e0ff",
+                borderRadius: 6,
+                padding: "4px 10px",
+                background: "#f5f5ff",
+              }}
+            >
+              Notionでログイン
+            </a>
+          )}
+
+          <button className="btn-secondary" onClick={reset} style={{ fontSize: 13, padding: "7px 16px" }}>
+            ＋ 新しい記事を要約する
+          </button>
+        </div>
       </header>
 
       <div style={{ maxWidth: 740, margin: "0 auto", padding: "32px 20px 80px" }}>
@@ -466,7 +562,11 @@ export default function Home() {
                 </span>
               )}
               <button className="btn-notion" onClick={saveToNotion} disabled={notionLoading}>
-                {notionLoading ? "保存中..." : "📋 Notionに保存"}
+                {notionLoading
+                  ? "保存中..."
+                  : notionAuth?.loggedIn
+                  ? "📋 Notionに保存"
+                  : "📋 Notionでログインして保存"}
               </button>
             </div>
           </div>
